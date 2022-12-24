@@ -1,28 +1,47 @@
 import { useState } from "react";
 import server from "./server";
+import { signMessage } from "./Cryptography";
+import { utf8ToBytes } from "ethereum-cryptography/utils"
+import { keccak256 } from "ethereum-cryptography/keccak";
 
-function Transfer({ address, setBalance }) {
+
+function Transfer({ address, setBalance, privateKey }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
 
+
   const setValue = (setter) => (evt) => setter(evt.target.value);
+
 
   async function transfer(evt) {
     evt.preventDefault();
 
+    const message = { sender: address, recipient, amount: parseInt(sendAmount)}
+
+
+    const {signature, recoveryBit} = await signMessage(JSON.stringify(message), privateKey)
+
+
     try {
+
       const {
         data: { balance },
       } = await server.post(`send`, {
+        message,
         sender: address,
         amount: parseInt(sendAmount),
         recipient,
+        signature,
+        recoveryBit,
       });
       setBalance(balance);
     } catch (ex) {
       alert(ex.response.data.message);
     }
   }
+
+
+
 
   return (
     <form className="container transfer" onSubmit={transfer}>
@@ -49,6 +68,14 @@ function Transfer({ address, setBalance }) {
       <input type="submit" className="button" value="Transfer" />
     </form>
   );
+}
+
+function hashMessage(message) {
+  const msgBytes = utf8ToBytes(message);
+
+  const hash = keccak256(msgBytes);
+
+  return hash;
 }
 
 export default Transfer;
